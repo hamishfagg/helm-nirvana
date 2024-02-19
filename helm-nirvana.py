@@ -11,14 +11,16 @@ import yaml
 app = typer.Typer()
 r_values_files = re.compile("values-.*\.ya?ml")
 
+
 def find_services():
     here_dirs = [d for d in os.listdir('.') if os.path.isdir(d)]
     if "deployment" in here_dirs:  # there is a "deployment" dir in the current dir
         os.chdir("./deployment")
-    
+
     # get dirs that looks like they could be for service helm charts
     service_dirs = [d for d in os.listdir(".") if os.path.isdir(d)]
     return [d for d in service_dirs if any(r_values_files.match(f) for f in os.listdir(d))]
+
 
 def find_envs(service_name):
     files = [f for f in os.listdir(service_name) if r_values_files.match(f)]
@@ -31,6 +33,7 @@ def check_requirements():
     # check we're logged into a cluster and print the cluster name for the user to check
     pass
 
+
 def main(namespace: str = None, service_name: str = None, env_name: str = None, image_tag: str = None):
     check_requirements()
 
@@ -42,6 +45,9 @@ def main(namespace: str = None, service_name: str = None, env_name: str = None, 
     if service_name is None:
         services = find_services()
         service_name = iterfzf.iterfzf(services, prompt="Service to deploy > ")
+
+    # We now have a service name so we can get helm to update dependencies in the background
+    depends_updater = subprocess.Popen([f"helm dependencies update {service_name}"], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     if namespace is None:
         namespaces = sub_namespaces.communicate()[0].split("\n")
@@ -61,11 +67,11 @@ def main(namespace: str = None, service_name: str = None, env_name: str = None, 
 
     if image_tag is None:
         values = sub_values.communicate()[0]  # Wait for the helm command to complete
-        values = yaml.safe_load(values) if sub_namespaces.returncode == 0 else {}  # If the helm command failed, we can't suggest any tags
+        values = yaml.safe_load(values) if sub_namespaces.returncode == 0 and values else {}  # If the helm command failed, we can't suggest any tags
         image_tag = values.get("global", {}).get("image", {}).get("tag", "latest")
 
         # Get an image tag from the user (default to the one we just got from helm)
-        image_tag = Prompt.ask("Image tag:", default=image_tag, )
+        image_tag = Prompt.ask("Image tag:", default=image_tag)
 
     # We now have all the info we need to do the upgrade
     table = Table(show_header=False)
@@ -75,6 +81,13 @@ def main(namespace: str = None, service_name: str = None, env_name: str = None, 
     table.add_row("Environment", env_name)
     table.add_row("Image Tag", image_tag)
     print(table)
+
+    # Wait for the dependency update to finish
+    if depends_updater.poll() is None:
+        print("Waiting for helm dependency update to finish...")
+    depends_err = depends_updater.communicate()[1]
+    if depends_updater.returncode != 0:
+        raise typer.Exit("Helm dependency update failed:\n" + depends_err)
 
     # Run helm diff and just print the output to console
     print("\n[bold]----- HELM DIFF OUTPUT ----[/bold]\n")
