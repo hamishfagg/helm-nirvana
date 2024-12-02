@@ -44,6 +44,8 @@ def main(namespace: str = None, service_name: str = None, env_name: str = None, 
 
     if service_name is None:
         services = find_services()
+        if not services:
+            raise typer.Exit("No services found in current directory")
         service_name = iterfzf.iterfzf(services, prompt="Service to deploy > ")
 
     # We now have a service name so we can get helm to update dependencies in the background
