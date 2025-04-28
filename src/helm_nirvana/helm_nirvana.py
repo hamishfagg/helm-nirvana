@@ -104,6 +104,8 @@ def main(namespace: str = None, service_name: str = None, env_name: str = None, 
     print("\n[bold]--- RUNNING HELM UPGRADE ---[/bold]\n")
     subprocess.Popen([f"helm upgrade --install --namespace {namespace} {service_name} {service_name} -f {service_name}/values.yaml -f {service_name}/values-{env_name}.yaml --set global.namespace=\"{namespace}\" --set global.image.tag=\"{image_tag}\""], shell=True).communicate()
 
+def main_cli():
+    typer.run(main)
 
 if __name__ == "__main__":
     typer.run(main)

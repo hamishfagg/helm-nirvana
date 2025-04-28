@@ -1,0 +1,18 @@
+[project]
+name = "helm-nirvana"
+version = "0.1"
+dependencies = [
+  "iterfzf",
+  "typer",
+  "pyyaml"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+helm-nirvana = "helm_nirvana.helm_nirvana:main_cli"
